@@ -149,7 +149,7 @@ Business definitions (from your standards): **high-value player** = lifetime spe
 | Toxicity | `ai_query` with a foundation model (structured output: category, severity, rationale) on reported messages plus a sample; compared with a keyword baseline | Precision / recall vs ground_truth chat labels, keyword false-positive rate |
 | Cheating | Rule-based behavioural flags (accuracy, headshot rate, kills per match) | Precision vs ground truth |
 
-All training tracked in MLflow; models registered in Unity Catalog; batch scores written to `ml_*_scores`.
+All training tracked in MLflow; models registered in Unity Catalog under schema `game_cx_players`. After evaluation, the best model version is assigned the `@champion` alias (e.g. `fraud_txn_classifier@champion`). Downstream scoring notebooks always reference `@champion` so a model swap requires only a re-alias, not a code change. Batch scores written to `ml_*_scores`.
 
 ## 8. Lakebase (operational serving)
 
@@ -205,7 +205,7 @@ Every table and every key column gets a `COMMENT` in SQL (or `SET TBLPROPERTIES`
 | `pii_type` | `email`, `date_of_birth`, `phone`, `player_name`, `chat_text` | PII columns across bronze, silver and gold |
 | `data_classification` | `PII`, `SENSITIVE`, `PUBLIC` | Table-level and column-level |
 | `layer` | `bronze`, `silver`, `gold`, `ml`, `serving` | Every table |
-| `domain` | `trust_safety`, `player_experience`, `game_analytics` | Every table |
+| `domain` | `player_trust_safety`, `player_experience` | Every table (shared dims tagged with both values) |
 
 ### 11c. ABAC column-mask policy (not per-table masks)
 1. Create group `game_cx_pii_viewers` (T&S leads, data scientists — see full values).
@@ -309,6 +309,7 @@ Expectation metrics are visible in the pipeline event log and (with Lakehouse Mo
 
 ## 13. Orchestration and evidence
 
+* Pipeline mode: **triggered** (not continuous). The SDP pipeline runs on-demand and on the daily job schedule — not as a live streaming pipeline. This is correct for historical batch data where new files arrive daily.
 * Job `game-cx-players-daily-job`: pipeline refresh -> reconciliation -> ML scoring notebooks -> Lakebase sync.
 * Evidence for the FE Bar evaluator (text only): notebooks committed as .ipynb with outputs (`.databricks/commit_outputs` file in repo), plus exported run logs and query results as markdown under `evidence/`.
 * `evidence/reconciliation.md`: row-count reconciliation across all layers after the pipeline run.
@@ -425,7 +426,7 @@ Status: all planning questions decided. Remaining build-time check: exact fast-t
 
 | Phase | Step | Key outputs / evidence |
 |---|---|---|
-| **0** | Setup: dbldatagen install, AI Gateway `game-cx-players-llm` (Haiku-5-5 primary, Haiku-4-5 fallback, PII guardrail, budget), schema `game_cx_players`, volumes `raw` + `ground_truth`, `.databricks/commit_outputs` | Gateway READY, schema and volumes exist |
+| **0** | Setup: (a) dbldatagen install check on serverless; (b) AI Gateway `game-cx-players-llm` (Haiku-5-5 primary, Haiku-4-5 fallback, PII guardrail, safety filter, budget); (c) schema `game_cx_players` + volumes `raw` + `ground_truth`; (d) Databricks Secrets scope `game-cx-players` + add Slack webhook URL as key `slack-webhook-url`; (e) create `.gitignore` (`.env`, `*.env`, `secrets.json`, `*.pem`, `*.key`); (f) `.databricks/commit_outputs` in repo | All checks pass; scope + secret exist; .gitignore committed |
 | **1** | `01_generate_raw_data`: dbldatagen (players, devices, games, events, traits) + PySpark (sessions, txns, chargebacks, chat, reports, ground truth). 3,659 raw files + 3 ground-truth parquets. Validation cell printed | File inventory, signal checks in notebook output |
 | **2** | Lakeflow SDP pipeline `game-cx-players-pipeline`: bronze (9 streaming tables) → silver (9 MVs with expectations) → gold dims (6) → gold facts (2) → `gold_mart_player_360` (placeholder, scores added in Phase 4) | Pipeline update SUCCESS, expectation metrics, row-count reconciliation in evidence/ |
 | **3a** | Comments on all tables and columns | ALTER TABLE DDL run without errors |
