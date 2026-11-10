@@ -49,8 +49,8 @@ Source systems (synthetic daily files)
   -> Unity Catalog: comments, tags, PII masks, lineage, metric view   [govern]
   -> ML: fraud model, churn model (MLflow, UC registry) + GenAI toxicity (ai_query)  [intelligent]
   -> gold_player_360 + ml_* scores -> serve_player_risk_profile synced to Lakebase   [operational serving]
-  -> Genie space over gold star schema + scores + metric view   [natural language]
-  -> Databricks App: Trust & Safety console reads Lakebase, writes moderation actions back   [business surface]
+  -> 2 Genie agents (Trust & Safety + Player Experience) over scoped table sets + metric view   [natural language]
+  -> Databricks App: Trust & Safety console reads Lakebase, writes moderation actions back, embeds both Genie agents   [business surface]
   -> Moderation actions flow back to the lakehouse (closed loop)
 ```
 
@@ -156,13 +156,41 @@ All training tracked in MLflow; models registered in Unity Catalog; batch scores
 * `lb_serve_player_risk_profile`: synced table from gold_mart_player_360 + scores (sub-second lookups for the app). `lb_` prefix marks all Lakebase tables.
 * `lb_moderation_actions` (native Postgres table): actions taken in the app (warn, mute, suspend, refund-block, clear), synced back to gold_fact_event (ACTION rows) for analytics and retraining.
 
-## 9. Genie space
+## 9. Genie agents (2)
 
-New space "Emberline - Player 360, Fraud & Toxicity" over the gold star schema, scores and metric view, with instructions for business definitions, join paths, sample questions and benchmark questions.
+Two agents, one per UC domain. Each is scoped to its domain's tables and vocabulary — fewer tables per agent means less LLM ambiguity and better answer quality.
+
+| | Agent 1 | Agent 2 |
+|---|---|---|
+| **Name** | `Emberline - Fraud & Trust Safety` | `Emberline - Player Experience & LiveOps` |
+| **UC domain** | Player Trust & Safety | Player Experience |
+| **Used by** | Fraud analysts, T&S moderators, Payments team | LiveOps managers, game designers, retention analysts |
+| **Tables** | `gold_fact_event`, `ml_fraud_txn_scores`, `ml_toxicity_message_labels`, `gold_mart_player_360`, `gold_dim_player`, `gold_dim_game`, `gold_dim_device`, `gold_dim_date`, `gold_dim_geography` | `gold_fact_session`, `gold_dim_live_ops_event`, `gold_dim_game`, `gold_dim_player`, `gold_dim_date`, `gold_dim_geography`, `gold_mart_player_360`, `ml_churn_player_scores` |
+| **Metric view** | `mv_player_trust_safety` | `mv_player_trust_safety` |
+| **Example SQL focus** | Fraud ring queries, chargeback rate, toxicity trends, repeat offenders, time to action | D7/D30 retention, DAU/MAU stickiness, event revenue uplift, churn cohorts, YoY MAU |
+| **Instructions focus** | Fraud ring definition, chargeback patterns, as_of_date rule, moderation action vocabulary | Engagement decay, LiveOps event windows, as_of_date rule, retention cohort definitions |
+| **Trusted assets** | `player_risk_profile(:player_id)`, `fraud_ring_members(:device_fingerprint)` | `player_session_history(:player_id)`, `event_uplift_analysis(:event_id)` |
+| **Benchmarks** | 10 Q&A pairs (fraud + toxicity) | 10 Q&A pairs (engagement + LiveOps) |
+| **Embedded in app** | ✅ "Ask Trust & Safety" tab | ✅ "Ask Player Experience" tab |
+
+**Why not Genie One API routing:** Genie One is not a native router between agents — building intent-based routing would require custom orchestration middleware, adding complexity and latency. Two explicit tabs in the app is simpler to build, easier to explain, and shows the domain separation clearly. Customer talking point: *"Genie One already routes across all governed tables in the workspace chat. The embedded tabs give each team a focused, scoped experience in the app."*
+
+Full configuration per agent (knowledge store, example SQL, instructions, trusted assets, benchmarks) follows the plan in section 17 Phase 6.
 
 ## 10. Databricks App
 
-`game-cx-players-console`: risk queue (high fraud / toxicity / churn), Player 360 profile page, fraud-ring view, message evidence with LLM rationale, action buttons written to Lakebase, embedded Genie for ad-hoc questions.
+`game-cx-players-console`: 6 views.
+
+| View | Data source | Key interaction |
+|---|---|---|
+| Risk Queue | `lb_serve_player_risk_profile` (Lakebase, sub-second) | Paginated by composite risk score; click → Player 360 |
+| Player 360 | `lb_serve_player_risk_profile` + `gold_fact_event` via analytics plugin | Take action → writes to `lb_moderation_actions` |
+| Fraud Ring View | `gold_fact_event` PURCHASE rows grouped by `device_fingerprint` | Bulk-action whole ring |
+| KPI Overview | `mv_player_trust_safety` via analytics plugin | Date filter; tiles + trend charts |
+| Ask Trust & Safety | Genie agent 1 (`Emberline - Fraud & Trust Safety`) via Genie plugin | Fraud + toxicity + moderation NL questions |
+| Ask Player Experience | Genie agent 2 (`Emberline - Player Experience & LiveOps`) via Genie plugin | Engagement + retention + LiveOps NL questions |
+
+Two Genie tabs in one console: a moderator investigating a player can ask "show me their fraud ring" in tab 1, then switch to tab 2 and ask "is this player high-value and what's their session trend?" — without leaving the app.
 
 ## 11. Governance (Unity Catalog)
 
@@ -198,16 +226,26 @@ Measures:
 * Player 360: `dau`, `mau`, `dau_mau_ratio`, `d7_retention`, `d30_retention`, `payer_conversion_rate`, `arppu_usd`, `high_value_player_count`, `revenue_at_risk_usd`
 * LiveOps: `event_revenue_uplift_pct`, `event_toxicity_uplift_pct`
 
-### 11f. UC Domain: `Gaming CX` with 3 sub-domains
-Created in Unity Catalog Discover. All project assets assigned.
+### 11f. UC Domains (2) and sub-domains (4)
+Created in Unity Catalog Discover. All project assets assigned. Two domains reflect realistic gaming company org structure — different owners, different KPIs, different day-to-day users.
+
+**Domain 1: `Player Trust & Safety`** (owner: Priya Raman, VP Player Experience & Trust)
 
 | Sub-domain | Tables | Other assets |
 |---|---|---|
-| Trust & Safety | `gold_fact_event`, `ml_fraud_txn_scores`, `ml_toxicity_message_labels`, `lb_serve_player_risk_profile`, `mv_player_trust_safety` | App `game-cx-players-console`, Dashboard pages 2 & 3 |
-| Player Experience | `gold_fact_session`, `gold_dim_player`, `gold_mart_player_360`, `ml_churn_player_scores` | Dashboard page 1 |
-| Game Analytics | `gold_dim_game`, `gold_dim_live_ops_event`, `gold_dim_date` | Genie space |
+| Fraud & Payments | `gold_fact_event`, `ml_fraud_txn_scores`, `lb_serve_player_risk_profile` | Dashboard page 2, alert `game-cx-players-fraud-ring-alert` |
+| Toxicity & Moderation | `ml_toxicity_message_labels`, `lb_moderation_actions`, `silver_player_reports` | App `game-cx-players-console`, Dashboard page 3, alert `game-cx-players-toxicity-spike-alert` |
 
-Why: in one screen, a Trust & Safety lead can navigate to their sub-domain and find every relevant table, app and dashboard. Strong product story: governed data estate for the whole business.
+**Domain 2: `Player Experience`** (owner: LiveOps manager / retention analyst)
+
+| Sub-domain | Tables | Other assets |
+|---|---|---|
+| Engagement & Retention | `gold_fact_session`, `gold_dim_player`, `gold_mart_player_360`, `ml_churn_player_scores` | Dashboard page 1 |
+| LiveOps & Revenue | `gold_dim_live_ops_event`, `gold_dim_game`, `mv_player_trust_safety` | Genie agent 2 |
+
+Shared assets (registered in both domains): `gold_dim_date`, `gold_dim_geography`, `gold_dim_device`.
+
+Why 2 domains: a Trust & Safety lead navigates to `Player Trust & Safety` and finds every relevant table, agent and alert. A LiveOps manager navigates to `Player Experience` and finds their engagement and revenue assets. Neither sees irrelevant assets cluttering their view.
 
 ### 11g. UC Glossary Pages (7)
 Human-authored business-term definitions, visible in Genie context, assistant and Catalog Explorer.
@@ -400,9 +438,9 @@ Status: all planning questions decided. Remaining build-time check: exact fast-t
 | **3h** | Custom skill `gaming-cx` in repo + `.assistant/skills/` | Skill loads cleanly |
 | **4** | `02_train_fraud_model`, `03_train_churn_model`, `04_classify_toxicity`, `05_build_player_360` | MLflow runs, model metrics in evidence/, `gold_mart_player_360` fully populated |
 | **5** | Lakebase `game-cx-players-lakebase`: `lb_serve_player_risk_profile` sync + `lb_moderation_actions` table + write-back to `gold_fact_event` ACTION rows | Lookup <50ms, round-trip write confirmed |
-| **6** | Genie space with instructions, benchmark questions, as_of_date rule | All 10 benchmark questions pass |
+| **6** | 2 Genie agents: `Emberline - Fraud & Trust Safety` + `Emberline - Player Experience & LiveOps`. Each: register scoped tables, knowledge store (synonyms + join paths + SQL expressions), 15–20 example SQL queries, plain-text instructions (as_of_date rule + domain vocabulary), 2 trusted assets, 10 benchmark questions. Run benchmarks on both; target ≥ 8/10 each. | Both agents: all benchmarks run, ≥ 8/10 pass each |
 | **7** | AI/BI dashboard `Emberline Player Trust & Safety` (3 pages on `mv_player_trust_safety`) + 2 Databricks SQL Alerts V2: `game-cx-players-fraud-ring-alert` (new fraud ring members with `fraud_risk_score > 0.8`, every 15 min, Slack + email) and `game-cx-players-toxicity-spike-alert` (`toxic_msgs_per_1k` rolling 1-hour rate > 2× 7-day baseline, every 30 min, Slack + email). Both alerts deployed via bundle. Demo destinations: Slack channel `#game-cx-players-alerts` + `mayur.gupta@databricks.com`. For a real customer: swap channel and DL — query SQL stays identical. Slack webhook URL stored in Databricks Secrets, never hardcoded. | Dashboard loads; both alerts fire on a test row; Slack message and email received |
-| **8** | AppKit app `game-cx-players-console` (5 views: risk queue, player 360, fraud ring, KPI overview, Ask Genie) | Smoke test passes |
+| **8** | AppKit app `game-cx-players-console` (6 views: risk queue, player 360, fraud ring, KPI overview, Ask Trust & Safety (Genie agent 1), Ask Player Experience (Genie agent 2)). Two Genie plugin instances, each pointing at its scoped agent. | Smoke test passes; both Genie tabs return answers |
 | **9** | Bundle `databricks.yml`: pipeline + job + app; `dev` deploy and run | Job run SUCCESS |
 | **10** | README, deck, roleplay script, AI build log, evidence/ text files; commit all notebooks with outputs; push to GitHub | Repo public, all notebooks have output cells |
 | **11** | End-to-end verification: reconciliation, ABAC check, Lakebase round-trip, app smoke test, Genie benchmark | All checks pass, documented in evidence/ |
