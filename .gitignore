@@ -1,0 +1,43 @@
+# ============================================================
+# SECURITY: Never commit secrets, credentials or sensitive data
+# ============================================================
+.env
+*.env
+.env.*
+secrets.json
+secrets.yaml
+secrets.yml
+*.pem
+*.key
+*.p12
+*.pfx
+local_config.py
+local_config.json
+
+# Databricks
+.databricks/
+!.databricks/commit_outputs
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+
+# Notebooks (keep .ipynb but exclude checkpoints)
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
