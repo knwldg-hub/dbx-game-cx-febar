@@ -14,8 +14,8 @@ secrets.yml
 local_config.py
 local_config.json
 
-# Databricks
-.databricks/
+# Databricks — ignore all .databricks contents EXCEPT commit_outputs
+.databricks/*
 !.databricks/commit_outputs
 
 # Python
