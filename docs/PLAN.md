@@ -13,7 +13,7 @@ Purpose: a reusable gaming customer demo that also serves as the FE Bar submissi
 | Leak | Owner | KPI hurt |
 |---|---|---|
 | Payment fraud: fraud rings buy currency with stolen cards and resell it | Payments / Finance | Chargeback rate, chargeback losses and fees, standing with card-network dispute monitoring programs |
-| Toxicity: about 4% of players drive abuse; the players they target churn about 2x | Trust & Safety | Victim churn, report backlog, time to action |
+| Toxicity: 3.8% of players drive abuse; victims churn 1.4× more than non-victims (75.9% vs 55.6%) | Trust & Safety | Victim churn, report backlog, time to action |
 | No Player 360: payments, sessions, chat and moderation are siloed | Player Experience / LiveOps | Retention of high-value players, LTV |
 
 **Outcome:** one governed Player 360 that scores every player and transaction for fraud risk, churn risk and toxicity, and puts a moderator and fraud-analyst console on top of it, with actions written back.
