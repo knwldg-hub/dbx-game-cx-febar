@@ -1,5 +1,9 @@
 -- Gold dimension: one row per country with region and local currency
-CREATE OR REFRESH MATERIALIZED VIEW gold_dim_geography
+CREATE OR REFRESH MATERIALIZED VIEW gold_dim_geography (
+  country  STRING COMMENT 'Two-letter ISO country code.',
+  region   STRING COMMENT 'Derived region: Americas, EMEA, APAC.',
+  currency STRING COMMENT 'ISO 4217 local currency code.'
+)
 COMMENT 'Geography dimension. One row per country with region and local currency mapping.'
 AS SELECT
   country,

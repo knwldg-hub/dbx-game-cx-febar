@@ -1,5 +1,16 @@
 -- Gold dimension: one row per player with derived age_band and region
-CREATE OR REFRESH MATERIALIZED VIEW gold_dim_player
+CREATE OR REFRESH MATERIALIZED VIEW gold_dim_player (
+  player_id           STRING  COMMENT 'Player identifier. PII: account identity.',
+  gamertag            STRING  COMMENT 'Public display name.',
+  email               STRING  COMMENT 'Email address. PII: direct identifier.',
+  date_of_birth       DATE    COMMENT 'Date of birth. PII: quasi-identifier.',
+  age_band            STRING  COMMENT 'Age bracket: 13-17, 18-24, 25-34, 35-44, 45+.',
+  country             STRING  COMMENT 'Two-letter ISO registration country.',
+  region              STRING  COMMENT 'Derived region: Americas, EMEA, APAC.',
+  registration_date   DATE    COMMENT 'Account creation date.',
+  acquisition_channel STRING  COMMENT 'Marketing channel that drove signup.',
+  signup_game_id      STRING  COMMENT 'First game the player registered into.'
+)
 COMMENT 'Player dimension. One row per player with age_band and region derived from silver.'
 CLUSTER BY (country)
 AS SELECT

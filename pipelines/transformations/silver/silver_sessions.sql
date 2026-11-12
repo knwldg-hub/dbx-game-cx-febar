@@ -1,10 +1,27 @@
 -- Silver: cleansed session telemetry with DQ expectations
 CREATE OR REFRESH MATERIALIZED VIEW silver_sessions (
-  CONSTRAINT pk_session_id         EXPECT (session_id IS NOT NULL)                                  ON VIOLATION DROP ROW,
-  CONSTRAINT fk_player_game        EXPECT (player_id IS NOT NULL AND game_id IS NOT NULL)           ON VIOLATION DROP ROW,
-  CONSTRAINT positive_duration     EXPECT (duration_min >= 0)                                       ON VIOLATION DROP ROW,
-  CONSTRAINT valid_accuracy        EXPECT (accuracy_pct IS NULL OR accuracy_pct BETWEEN 0 AND 100) ,
-  CONSTRAINT valid_session_date    EXPECT (session_date BETWEEN '2025-01-01' AND '2026-12-31')
+  session_id          STRING    COMMENT 'Session identifier.',
+  player_id           STRING    COMMENT 'Player who played this session.',
+  game_id             STRING    COMMENT 'Game title for this session.',
+  device_id           STRING    COMMENT 'Device used for this session.',
+  session_date        DATE      COMMENT 'Calendar date the session occurred.',
+  session_start_ts    TIMESTAMP COMMENT 'Session start timestamp.',
+  session_end_ts      TIMESTAMP COMMENT 'Session end timestamp.',
+  duration_min        DOUBLE    COMMENT 'Session length in minutes. Negative values are dropped.',
+  matches             INT       COMMENT 'Matches played in the session.',
+  kills               INT       COMMENT 'Total kills. NULL for non-shooter titles.',
+  deaths              INT       COMMENT 'Total deaths. NULL for non-shooter titles.',
+  accuracy_pct        DOUBLE    COMMENT 'Shot accuracy 0-100%. NULL for non-shooter titles.',
+  headshot_pct        DOUBLE    COMMENT 'Headshot rate 0-100%. NULL for non-shooter titles.',
+  ping_ms             INT       COMMENT 'Network latency in milliseconds.',
+  matchmaking_quality DOUBLE    COMMENT 'Matchmaking quality score 0-1.',
+  ip_country          STRING    COMMENT 'Country inferred from IP at session time — used in fraud detection.',
+  live_ops_event_id   STRING    COMMENT 'Live-ops event active during this session, if any.',
+  CONSTRAINT pk_session_id      EXPECT (session_id IS NOT NULL)                                  ON VIOLATION DROP ROW,
+  CONSTRAINT fk_player_game     EXPECT (player_id IS NOT NULL AND game_id IS NOT NULL)           ON VIOLATION DROP ROW,
+  CONSTRAINT positive_duration  EXPECT (duration_min >= 0)                                       ON VIOLATION DROP ROW,
+  CONSTRAINT valid_accuracy     EXPECT (accuracy_pct IS NULL OR accuracy_pct BETWEEN 0 AND 100) ,
+  CONSTRAINT valid_session_date EXPECT (session_date BETWEEN '2025-01-01' AND '2026-12-31')
 )
 COMMENT 'Cleansed session telemetry. Negative durations dropped; out-of-range accuracy warned (NULL accuracy is valid for non-shooter titles).'
 AS SELECT

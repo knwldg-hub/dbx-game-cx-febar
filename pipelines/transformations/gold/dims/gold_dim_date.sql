@@ -1,5 +1,15 @@
 -- Gold dimension: calendar date spine (2025-01-01 to 2026-12-31)
-CREATE OR REFRESH MATERIALIZED VIEW gold_dim_date
+CREATE OR REFRESH MATERIALIZED VIEW gold_dim_date (
+  date_key          INT     COMMENT 'Integer surrogate key YYYYMMDD.',
+  date              DATE    COMMENT 'Calendar date.',
+  week              INT     COMMENT 'ISO week number within the year.',
+  month             INT     COMMENT 'Month number 1-12.',
+  quarter           INT     COMMENT 'Quarter number 1-4.',
+  year              INT     COMMENT 'Calendar year.',
+  is_weekend        BOOLEAN COMMENT 'True for Saturday and Sunday.',
+  is_holiday_season BOOLEAN COMMENT 'True for Dec 15 - Jan 5 (peak gaming season).',
+  is_as_of_date     BOOLEAN COMMENT 'True for the simulated reference date 2026-12-31.'
+)
 COMMENT 'Date dimension. One row per day from 2025-01-01 to 2026-12-31. is_as_of_date marks the simulated reference date 2026-12-31.'
 AS SELECT
   CAST(DATE_FORMAT(d, 'yyyyMMdd') AS INT) AS date_key,
