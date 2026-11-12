@@ -1,6 +1,6 @@
 # Game CX Players: Player 360, Payment Fraud and Toxicity (plan and requirements)
 
-Status: PHASE 1 COMPLETE. Owner: Mayur Gupta. Last updated: 2026-11-11.
+Status: PHASE 2 COMPLETE. Owner: Mayur Gupta. Last updated: 2026-11-12.
 
 Purpose: a reusable gaming customer demo that also serves as the FE Bar submission. Databricks asset names stay generic (no program-specific names) so the build can be reused with customers.
 
@@ -428,7 +428,7 @@ Status: all planning questions decided. Remaining build-time check: exact fast-t
 |---|---|---|
 | **0** | Setup: (a) dbldatagen install check on serverless; (b) AI Gateway `game-cx-players-llm` (Haiku-5-5 primary, Haiku-4-5 fallback, PII guardrail, safety filter, budget); (c) schema `game_cx_players` + volumes `raw` + `ground_truth`; (d) Databricks Secrets scope `game-cx-players` (Slack webhook key `slack-webhook-url` DEFERRED — see Deferred items); (e) create `.gitignore` (`.env`, `*.env`, `secrets.json`, `*.pem`, `*.key`); (f) `.databricks/commit_outputs` in repo | All checks pass; scope + secret exist; .gitignore committed |
 | **1** | `01_generate_raw_data`: **COMPLETE**. 3,626 raw files (4 ref + 730+730+702+730+730 daily) + 3 GT parquet dirs. Validation signals: MAU trend ✓, victim churn 75.9% vs 55.6% ✓, whales 58% of revenue ✓, cheater accuracy 2.5× ✓, CB lift 16× on country mismatch ✓, esports toxicity 7.1% vs 5.0% ✓, keyword FP 85.7% on banter ✓ | Notebook committed with outputs |
-| **2** | Lakeflow SDP pipeline `game-cx-players-pipeline`: bronze (9 streaming tables) → silver (9 MVs with expectations) → gold dims (6) → gold facts (2) → `gold_mart_player_360` (placeholder, scores added in Phase 4) | Pipeline update SUCCESS, expectation metrics, row-count reconciliation in evidence/ |
+| **2** | Lakeflow SDP pipeline `game-cx-players-pipeline`: **COMPLETE**. 27 datasets (9 bronze ST + 9 silver MV + 6 gold dim MV + 2 gold fact MV + 1 gold mart MV). Pipeline ID `8cc02b90-7598-4b0a-917a-0c7f64b78b6a`. Session drops 21,606 (0.30% negative duration_min). Fact event: 948,078 PURCHASE + 57,509 REPORT = 1,005,587. Chargebacks merged: 9,442. Mart: 50K players, 6,362 high-value. | Pipeline update SUCCESS, row-count reconciliation verified |
 | **3a** | Comments on all tables and columns | ALTER TABLE DDL run without errors |
 | **3b** | Governed tags (`pii_type`, `data_classification`, `layer`, `domain`) on all tables and PII columns | Tags visible in Catalog Explorer |
 | **3c** | ABAC: group `game_cx_pii_viewers`, UDF `mask_pii`, policy `mask_pii_policy` at schema level | Query as non-member → `***REDACTED***`; as member → full value |
