@@ -3,10 +3,10 @@ CREATE OR REFRESH MATERIALIZED VIEW silver_sessions (
   CONSTRAINT pk_session_id         EXPECT (session_id IS NOT NULL)                                  ON VIOLATION DROP ROW,
   CONSTRAINT fk_player_game        EXPECT (player_id IS NOT NULL AND game_id IS NOT NULL)           ON VIOLATION DROP ROW,
   CONSTRAINT positive_duration     EXPECT (duration_min >= 0)                                       ON VIOLATION DROP ROW,
-  CONSTRAINT valid_accuracy        EXPECT (accuracy_pct BETWEEN 0 AND 100)                          ,
+  CONSTRAINT valid_accuracy        EXPECT (accuracy_pct IS NULL OR accuracy_pct BETWEEN 0 AND 100) ,
   CONSTRAINT valid_session_date    EXPECT (session_date BETWEEN '2025-01-01' AND '2026-12-31')
 )
-COMMENT 'Cleansed session telemetry. Negative durations dropped; out-of-range accuracy warned.'
+COMMENT 'Cleansed session telemetry. Negative durations dropped; out-of-range accuracy warned (NULL accuracy is valid for non-shooter titles).'
 AS SELECT
   session_id,
   CAST(player_id AS STRING)    AS player_id,

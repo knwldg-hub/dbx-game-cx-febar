@@ -1,7 +1,7 @@
 -- Silver: cleansed player accounts with DQ expectations
 CREATE OR REFRESH MATERIALIZED VIEW silver_players (
   CONSTRAINT pk_player_id        EXPECT (player_id IS NOT NULL)                                    ON VIOLATION DROP ROW,
-  CONSTRAINT valid_email          EXPECT (email IS NULL OR email RLIKE '^[^@]+@[^@]+\\.[^@]+')      ,
+  CONSTRAINT valid_email          EXPECT (email IS NOT NULL AND email RLIKE '^[^@]+@[^@]+\\.[^@]+') ,
   CONSTRAINT valid_reg_date       EXPECT (registration_date BETWEEN '2020-01-01' AND '2026-12-31')
 )
 COMMENT 'Cleansed player account data. Null player_id rows dropped; invalid email and registration_date rows warned.'

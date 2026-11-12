@@ -1,6 +1,6 @@
 -- Gold fact: one row per game session, enriched with date_key and live_ops_event_id
 CREATE OR REFRESH MATERIALIZED VIEW gold_fact_session
-COMMENT 'Session fact table. One row per session with date_key and the most recent overlapping live-ops event (if any).'
+COMMENT 'Session fact table. One row per game session with date_key and the live-ops event active for that game at session time (NULL if none), as recorded by telemetry.'
 CLUSTER BY (game_id, session_date)
 AS SELECT
   session_id,

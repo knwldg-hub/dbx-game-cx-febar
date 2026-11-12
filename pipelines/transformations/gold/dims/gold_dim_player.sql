@@ -16,9 +16,9 @@ AS SELECT
   END AS age_band,
   country,
   CASE
-    WHEN country IN ('US', 'CA', 'MX', 'BR') THEN 'Americas'
-    WHEN country IN ('GB', 'DE', 'FR', 'PL', 'SE', 'RU', 'TR') THEN 'EMEA'
-    WHEN country IN ('JP', 'KR', 'AU', 'IN') THEN 'APAC'
+    WHEN country IN ('US', 'CA', 'MX', 'BR', 'AR') THEN 'Americas'
+    WHEN country IN ('GB', 'DE', 'FR', 'ES', 'IT', 'NL', 'PL', 'SE') THEN 'EMEA'
+    WHEN country IN ('JP', 'KR', 'AU', 'IN', 'PH') THEN 'APAC'
     ELSE 'Other'
   END AS region,
   registration_date,
