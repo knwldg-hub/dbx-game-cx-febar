@@ -1,6 +1,8 @@
 # Game CX Players: Player 360, Payment Fraud and Toxicity (plan and requirements)
 
-Status: PHASE 2 COMPLETE. Owner: Mayur Gupta. Last updated: 2026-11-12.
+Status: PHASE 3 IN PROGRESS (3a, 3b, 3e done; 3c half done; 3d deferred). Owner: Mayur Gupta. Last updated: 2026-11-12.
+
+Pipeline mode: stays in development mode. Production mode will be reviewed later, only if and when required (likely Phase 7, through the bundle's production target).
 
 Purpose: a reusable gaming customer demo that also serves as the FE Bar submission. Databricks asset names stay generic (no program-specific names) so the build can be reused with customers.
 
@@ -199,23 +201,39 @@ Governance spans 8 steps in Phase 3 of the build:
 ### 11a. Table and column comments
 Every table and every key column gets a `COMMENT` in SQL (or `SET TBLPROPERTIES`). The evaluator, Genie and future users can read the purpose of every object without asking.
 
+**As built:** `COMMENT ON` / `ALTER` on pipeline tables is blocked or reverted, so comments live in the pipeline SQL as typed column lists (`name TYPE COMMENT '...'`). A names-only list passes the dry run but the comments silently do not land. All 9 silver + 9 gold files done; bronze left schema-inferred by Auto Loader.
+
 ### 11b. Governed tags
 | Tag key | Values | Applied to |
 |---|---|---|
-| `pii_type` | `email`, `date_of_birth`, `phone`, `player_name`, `chat_text` | PII columns across bronze, silver and gold |
-| `data_classification` | `PII`, `SENSITIVE`, `PUBLIC` | Table-level and column-level |
-| `layer` | `bronze`, `silver`, `gold`, `ml`, `serving` | Every table |
-| `domain` | `player_trust_safety`, `player_experience` | Every table (shared dims tagged with both values) |
+| `pii_type` | `email`, `phone` (account policy allows only `ssn`, `email`, `phone`, `credit_card`, `name`, `address`) | 5 columns: `email` and `phone_number` in bronze_account_players and silver_players; `email` in gold_dim_player |
+| `data_classification` | `pii`, `cui`, `u-nnpi` (account policy values) | Table level, all 27 tables: `pii` 16 (tables with PII), `cui` 3 (sessions), `u-nnpi` 8 (games, live-ops events, date, geography) |
+| `layer` | `bronze`, `silver`, `gold` (account policy values; no `ml` or `serving`) | Every table |
+| ~~`domain`~~ | Not used | Account policy restricts `domain` to `finance`, `sales`, `supply_chain`, `quality`, `hr`, `operations`. Domain membership is shown through UC Domains (11f) instead |
+
+**Deliberately not tagged:**
+* `billing_country`: an ABAC mask on it would hide the billing vs IP country mismatch, a key fraud signal, from analysts outside `game_cx_pii_viewers`.
+* `gamertag`: a public display name (column comment says non-PII), and moderators need it in the console.
+* `date_of_birth`, `device_fingerprint`, `message_text`: no matching `pii_type` value in the account policy, so the ABAC policy does not mask them. Known gap; fix needs an account admin to add values.
 
 ### 11c. ABAC column-mask policy (not per-table masks)
 1. Create group `game_cx_pii_viewers` (T&S leads, data scientists — see full values).
 2. Create UDF `mask_pii(val STRING)` — returns real value for `game_cx_pii_viewers`, `***REDACTED***` for everyone else.
 3. `CREATE POLICY mask_pii_policy ON SCHEMA mg_aws_serverless_workspace_catalog.game_cx_players COLUMN MASK mask_pii TO account users EXCEPT (game_cx_pii_viewers) FOR TABLES MATCH COLUMNS has_tag('pii_type') AS pii_col ON COLUMN pii_col;`
 
+**As built:**
+* Step 2 done: `mask_pii` created (`governance/mask_pii.sql`). NULL stays NULL. Tested: email, phone and gamertag all return `***REDACTED***` for a non-member.
+* Steps 1 and 3 waiting: `game_cx_pii_viewers` does not exist yet. It must be an account-level group (workspace-local groups do not work with UC policies).
+* Check before step 3: the pipeline's run-as identity must be able to read real values (in the group or exempt). Otherwise silver/gold refreshes would store `***REDACTED***`.
+
 Why ABAC: one policy at the schema level covers every current and future table. Adding a new PII column requires only tagging it — no ALTER TABLE, no new mask function. Centrally auditable in Catalog Explorer.
 
 ### 11d. Lakehouse Monitoring (DQM) on silver tables
 Enable on `silver_sessions`, `silver_transactions`, `silver_chat_messages`. Tracks null rates, value distributions and row counts over time. Creates a ready-made DQM dashboard — shows continuous quality monitoring, not just a one-time check.
+
+**As built: deferred.** The workspace is at its 1,000-monitor limit (HTTP 429). Script `governance/create_quality_profiles.py` is ready and safe to re-run; run it when capacity frees up. Until then, pipeline expectations and `evidence/reconciliation.md` show quality checks working.
+* Snapshot profiles, not time series: a new time-series profile only analyzes the 30 days before it is created (wall clock), which misses the simulated 2-year history.
+* Cost: each refresh rescans the full table (silver_sessions ~7M rows). No schedule; the Phase 7 daily job triggers refreshes after each pipeline update.
 
 ### 11e. Metric view `mv_player_trust_safety`
 Semantic layer for the dashboard, Genie, app KPIs and agents. All business-logic aggregations defined once here.
@@ -225,6 +243,13 @@ Measures:
 * Toxicity: `toxic_msgs_per_1k`, `pct_reports_auto_triaged`, `avg_time_to_action_hours`, `repeat_offender_rate`, `toxicity_driven_churn_rate`
 * Player 360: `dau`, `mau`, `dau_mau_ratio`, `d7_retention`, `d30_retention`, `payer_conversion_rate`, `arppu_usd`, `high_value_player_count`, `revenue_at_risk_usd`
 * LiveOps: `event_revenue_uplift_pct`, `event_toxicity_uplift_pct`
+
+**As built (v1):** source `gold_fact_event`, many-to-one joins to `gold_dim_date`, `gold_dim_game`, `gold_dim_player`, `gold_mart_player_360` (keys verified unique). Definition in `governance/mv_player_trust_safety.py` (run through `spark.sql`; a `%sql` cell fails to parse the `$$` YAML body).
+* 13 measures live: `purchase_count`, `gross_revenue_usd`, `net_revenue_usd`, `paying_players`, `arppu_usd`, `chargeback_count`, `chargeback_rate` (0-1 ratio shown as %; replaces `chargeback_rate_pct`), `chargeback_disputed_usd`, `chargeback_fees_usd`, `chargeback_loss_usd`, `report_count`, `reported_players`, `high_value_player_count`.
+* Dimension `is_chargeback_window_closed` (purchase >= 75 days before as_of_date): chargebacks arrive 15-75 days late, so recent rates read 3-5x low. Filter to true for final rates.
+* Reconciled exactly against silver tables and the mart: 948,078 purchases, 9,442 chargebacks, 57,509 reports, 6,362 high-value players.
+* Added later: fraud/toxicity/churn measures (Phase 4), `avg_time_to_action_hours` (Phase 8).
+* Session-grain measures (`dau`, `mau`, `dau_mau_ratio`, D7/D30 retention, event uplift) do not fit an event-grain view. Proposed: a second metric view on `gold_fact_session` (not yet agreed).
 
 ### 11f. UC Domains (2) and sub-domains (4)
 Created in Unity Catalog Discover. All project assets assigned. Two domains reflect realistic gaming company org structure — different owners, different KPIs, different day-to-day users.
@@ -429,12 +454,12 @@ Status: all planning questions decided. Remaining build-time check: exact fast-t
 | **0** | Setup: (a) dbldatagen install check on serverless; (b) AI Gateway `game-cx-players-llm` (Haiku-5-5 primary, Haiku-4-5 fallback, PII guardrail, safety filter, budget); (c) schema `game_cx_players` + volumes `raw` + `ground_truth`; (d) Databricks Secrets scope `game-cx-players` (Slack webhook key `slack-webhook-url` DEFERRED — see Deferred items); (e) create `.gitignore` (`.env`, `*.env`, `secrets.json`, `*.pem`, `*.key`); (f) `.databricks/commit_outputs` in repo | All checks pass; scope + secret exist; .gitignore committed |
 | **1** | `01_generate_raw_data`: **COMPLETE**. 3,626 raw files (4 ref + 730+730+702+730+730 daily) + 3 GT parquet dirs. Validation signals: MAU trend ✓, victim churn 75.9% vs 55.6% ✓, whales 58% of revenue ✓, cheater accuracy 2.5× ✓, CB lift 16× on country mismatch ✓, esports toxicity 7.1% vs 5.0% ✓, keyword FP 85.7% on banter ✓ | Notebook committed with outputs |
 | **2** | Lakeflow SDP pipeline `game-cx-players-pipeline`: **COMPLETE**. 27 datasets (9 bronze ST + 9 silver MV + 6 gold dim MV + 2 gold fact MV + 1 gold mart MV). Pipeline ID `8cc02b90-7598-4b0a-917a-0c7f64b78b6a`. Session drops 21,606 (0.30% negative duration_min). Fact event: 948,078 PURCHASE + 57,509 REPORT = 1,005,587. Chargebacks merged: 9,442. Mart: 50K players, 6,362 high-value. | Pipeline update SUCCESS, row-count reconciliation verified |
-| **3a** | Comments on all tables and columns | ALTER TABLE DDL run without errors |
-| **3b** | Governed tags (`pii_type`, `data_classification`, `layer`, `domain`) on all tables and PII columns | Tags visible in Catalog Explorer |
-| **3c** | ABAC: group `game_cx_pii_viewers`, UDF `mask_pii`, policy `mask_pii_policy` at schema level | Query as non-member → `***REDACTED***`; as member → full value |
-| **3d** | Lakehouse Monitoring on `silver_sessions`, `silver_transactions`, `silver_chat_messages` | DQM dashboard created |
-| **3e** | Metric view `mv_player_trust_safety` | Query returns all measures |
-| **3f** | UC Domain `Gaming CX` + 3 sub-domains; assign all assets | Visible in Discover |
+| **3a** | Comments on all tables and columns: **COMPLETE**. Typed column lists in all 18 silver/gold pipeline files | Comments verified in `information_schema.columns` |
+| **3b** | Governed tags: **COMPLETE**. `layer` + `data_classification` on all 27 tables; `pii_type` on 5 email/phone columns; `domain` not used (account policy) | 54 table tags verified in `information_schema.table_tags` |
+| **3c** | ABAC: group `game_cx_pii_viewers`, UDF `mask_pii`, policy `mask_pii_policy` at schema level: **UDF DONE**, waiting on account group | Query as non-member → `***REDACTED***` (verified for UDF); as member → full value (pending group) |
+| **3d** | Lakehouse Monitoring on `silver_sessions`, `silver_transactions`, `silver_chat_messages`: **DEFERRED** (workspace monitor limit) | DQM dashboard created |
+| **3e** | Metric view `mv_player_trust_safety`: **COMPLETE (v1, 13 measures)** | Measures reconcile to silver tables |
+| **3f** | 2 UC Domains (`Player Trust & Safety`, `Player Experience`) + 4 sub-domains per section 11f; assign existing assets now, later-phase assets as they are built | Visible in Discover |
 | **3g** | 7 Glossary pages | Pages published in Discover |
 | **3h** | Custom skill `gaming-cx` in repo + `.assistant/skills/` | Skill loads cleanly |
 | **4** | `02_train_fraud_model`, `03_train_churn_model`, `04_classify_toxicity`, `05_build_player_360` | MLflow runs, model metrics in evidence/, `gold_mart_player_360` fully populated |
