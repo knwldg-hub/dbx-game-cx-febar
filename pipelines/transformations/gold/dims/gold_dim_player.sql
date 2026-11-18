@@ -2,7 +2,7 @@
 CREATE OR REFRESH MATERIALIZED VIEW gold_dim_player (
   player_id           STRING  COMMENT 'Player identifier. PII: account identity.',
   gamertag            STRING  COMMENT 'Public display name.',
-  email               STRING  COMMENT 'Email address. PII: direct identifier.',
+  email               STRING  MASK mg_aws_serverless_workspace_catalog.game_cx_players.mask_pii  COMMENT 'Email address. PII: direct identifier. Masked for non-members of game_cx_pii_viewers.',
   date_of_birth       DATE    COMMENT 'Date of birth. PII: quasi-identifier.',
   age_band            STRING  COMMENT 'Age bracket: 13-17, 18-24, 25-34, 35-44, 45+.',
   country             STRING  COMMENT 'Two-letter ISO registration country.',

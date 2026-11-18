@@ -2,8 +2,8 @@
 CREATE OR REFRESH MATERIALIZED VIEW silver_players (
   player_id           STRING  COMMENT 'Player identifier. PII: account identity.',
   gamertag            STRING  COMMENT 'Public display name (non-PII).',
-  email               STRING  COMMENT 'Email address. PII: direct identifier.',
-  phone_number        STRING  COMMENT 'Phone number. PII: direct identifier.',
+  email               STRING  MASK mg_aws_serverless_workspace_catalog.game_cx_players.mask_pii  COMMENT 'Email address. PII: direct identifier. Masked for non-members of game_cx_pii_viewers.',
+  phone_number        STRING  MASK mg_aws_serverless_workspace_catalog.game_cx_players.mask_pii  COMMENT 'Phone number. PII: direct identifier. Masked for non-members of game_cx_pii_viewers.',
   date_of_birth       DATE    COMMENT 'Date of birth. PII: quasi-identifier.',
   age                 INT     COMMENT 'Age in years at time of data extraction.',
   country             STRING  COMMENT 'Two-letter ISO registration country.',

@@ -9,7 +9,7 @@ CREATE OR REFRESH MATERIALIZED VIEW silver_chat_messages (
   language             STRING    COMMENT 'BCP-47 language code detected for this message.',
   sent_ts              TIMESTAMP COMMENT 'Message send timestamp.',
   sent_date            DATE      COMMENT 'Message send date.',
-  message_text         STRING    COMMENT 'Raw message content. Used for toxicity scoring (Phase 4). PII: free text.',
+  message_text         STRING    MASK mg_aws_serverless_workspace_catalog.game_cx_players.mask_pii  COMMENT 'Raw message content. Used for toxicity scoring (Phase 4). PII: free text. Masked for non-members of game_cx_pii_viewers.',
   CONSTRAINT pk_message     EXPECT (message_id IS NOT NULL AND sender_player_id IS NOT NULL) ON VIOLATION DROP ROW,
   CONSTRAINT non_empty_text EXPECT (LENGTH(TRIM(message_text)) > 0)                         ON VIOLATION DROP ROW
 )
