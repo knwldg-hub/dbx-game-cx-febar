@@ -59,7 +59,7 @@ description: Domain knowledge for the Emberline Studios Game CX demo (catalog mg
 | `gold_fact_event` | 1 row / event (PURCHASE or REPORT) | `player_id`, `game_id`, `date_key` → dims; `txn_id` for purchases; `report_id` for reports |
 
 ### Gold mart
-`gold_mart_player_360` — 1 row per player, 50,000 rows. Joins engagement (from sessions), spend (from transactions), churn score, fraud score, toxicity score, reports received, and recommended moderation action.
+`gold_mart_player_360` — 1 row per player, 50,000 rows. Columns: `player_id`, `lifetime_spend_usd`, `last_active_date`, `sessions_30d`, `engagement_trend`, `is_high_value_player`, `is_at_risk`, `churn_risk_score`, `fraud_risk_score`, `toxicity_score`, `reports_received`, `toxic_messages_received`, `recommended_action`. **Note**: `account_status` and `acquisition_channel` are only in `silver_players`, not in the mart.
 
 ### Metric view
 `mv_player_trust_safety` — 15 dimensions × 13 measures on `gold_fact_event`. **Always query this for aggregated fraud, revenue, chargeback, and report KPIs**; do not re-aggregate from fact tables unless you need a grain the metric view doesn't expose.
@@ -107,15 +107,22 @@ ORDER BY ring_size DESC;
 
 ### Chargeback rate by game (closed window only)
 ```sql
+-- mv_player_trust_safety is a METRIC VIEW: wrap measures in MEASURE(), use GROUP BY ALL
 SELECT
   game_title,
-  SUM(chargeback_count) AS chargebacks,
-  SUM(purchase_count)   AS purchases,
-  ROUND(SUM(chargeback_count) * 1.0 / SUM(purchase_count), 4) AS chargeback_rate
+  MEASURE(chargeback_rate)     AS chargeback_rate,
+  MEASURE(chargeback_loss_usd) AS chargeback_loss
 FROM mg_aws_serverless_workspace_catalog.game_cx_players.mv_player_trust_safety
 WHERE is_chargeback_window_closed = true
-GROUP BY game_title
+GROUP BY ALL
 ORDER BY chargeback_rate DESC;
+```
+
+### Account status / acquisition channel (from silver_players)
+```sql
+SELECT account_status, COUNT(*) AS players
+FROM mg_aws_serverless_workspace_catalog.game_cx_players.silver_players
+GROUP BY account_status ORDER BY players DESC;
 ```
 
 ### High-value at-risk players (revenue at risk)
@@ -139,6 +146,15 @@ JOIN mg_aws_serverless_workspace_catalog.game_cx_players.silver_games USING (gam
 GROUP BY 1, 2
 ORDER BY 1, 2;
 ```
+
+---
+
+## Genie agents (Phase 6)
+
+| Agent | Space ID | Tables | Benchmarks |
+|---|---|---|---|
+| `Emberline - Fraud & Trust Safety` | `01f1e3a90ede1597be6672ea8668991e` | mv_player_trust_safety, gold_mart_player_360, ml_fraud_txn_scores, ml_toxicity_message_labels, gold_dim_device, silver_player_reports, gold_dim_player, gold_dim_game | 10/10 |
+| `Emberline - Player Experience & LiveOps` | `01f1e3acd3fc1b039e9c20dbf124669b` | gold_mart_player_360, ml_churn_player_scores, gold_fact_session, gold_dim_player, gold_dim_game, gold_dim_live_ops_event, gold_dim_geography, silver_transactions, silver_players | 10/10 |
 
 ---
 
