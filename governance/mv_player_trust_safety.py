@@ -2,7 +2,12 @@
 
 Run with spark.sql (a %sql cell failed to parse the $$ YAML body).
 
-Grain: one row per account-level event in gold_fact_event (PURCHASE + REPORT).
+Grain: one row per account-level event in gold_fact_event (PURCHASE + REPORT + ACTION).
+
+Phase 9 (2026-11-19): added closed-loop ACTION measures (action_count, actioned_players, suspensions_issued,
+warnings_issued) and dimensions account_status, recommended_action, action_type, is_suspected_cheater.
+Switched to ALTER VIEW so grants (app SP, Genie) are preserved. Cheat / engagement KPIs live in
+mv_player_engagement (session grain) because most cheaters have no PURCHASE/REPORT events.
 All 4 joins are many-to-one (keys verified unique: dim_date 730, dim_game 6, dim_player 50,000, mart 50,000).
 
 Included now: purchases, gross/net revenue, paying players, ARPPU, chargeback count/rate/disputed/fees/loss,
@@ -22,7 +27,8 @@ MV_YAML = r"""
 version: 1.1
 comment: >-
   Trust & Safety and Player 360 KPIs for Emberline Studios, defined once for dashboards, Genie and the app.
-  Grain: one row per account-level event in gold_fact_event (PURCHASE and REPORT; ACTION rows arrive in Phase 8).
+  Grain: one row per account-level event in gold_fact_event (PURCHASE, REPORT and ACTION = moderator action
+  taken in the console, dated at as_of_date).
   Dates come from gold_dim_date. as_of_date is 2026-12-31; never use current_date().
 source: mg_aws_serverless_workspace_catalog.game_cx_players.gold_fact_event
 joins:
@@ -58,7 +64,12 @@ dimensions:
       purchase, so chargeback rates for later purchases are still incomplete. Filter to true for final rates.
   - name: event_type
     expr: source.event_type
-    comment: PURCHASE or REPORT (ACTION added in Phase 8).
+    comment: PURCHASE, REPORT or ACTION (moderator action written back from the console).
+  - name: action_type
+    expr: source.action_type
+    comment: Moderator action for ACTION events (warn, mute, suspend, refund_block, clear).
+  - name: moderator
+    expr: source.moderator
   - name: game_title
     expr: games.title
     synonyms:
@@ -84,6 +95,16 @@ dimensions:
   - name: is_high_value_player
     expr: p360.is_high_value_player
     comment: Lifetime spend over 50 USD and active within 14 days of as_of_date (2026-12-31).
+  - name: account_status
+    expr: p360.account_status
+    comment: active or closed.
+  - name: recommended_action
+    expr: p360.recommended_action
+    comment: >-
+      Current recommendation for the player: suspend, review_fraud, warn_toxicity, review_cheating, retain,
+      monitor, or NULL (no action needed).
+  - name: is_suspected_cheater
+    expr: p360.is_suspected_cheater
 measures:
   - name: purchase_count
     expr: COUNT(1) FILTER (WHERE source.event_type = 'PURCHASE')
@@ -162,8 +183,25 @@ measures:
     comment: >-
       Distinct high-value players (status as of 2026-12-31) with at least one event in the selected slice.
       Every high-value player has purchases, so with no filters this equals the total high-value player count.
+  - name: action_count
+    expr: COUNT(1) FILTER (WHERE source.event_type = 'ACTION')
+    comment: Moderator actions recorded in the console (closed loop from Lakebase).
+    synonyms:
+      - moderation actions
+      - actions taken
+  - name: actioned_players
+    expr: COUNT(DISTINCT source.player_id) FILTER (WHERE source.event_type = 'ACTION')
+    comment: Distinct players with at least one moderator action.
+  - name: suspensions_issued
+    expr: COUNT(1) FILTER (WHERE source.event_type = 'ACTION' AND source.action_type = 'suspend')
+  - name: warnings_issued
+    expr: COUNT(1) FILTER (WHERE source.event_type = 'ACTION' AND source.action_type = 'warn')
 """
 
-# CREATE OR REPLACE resets grants on the view; switch to ALTER VIEW ... AS $$ ... $$ once permissions are assigned.
-spark.sql(f"CREATE OR REPLACE VIEW {MV_NAME} WITH METRICS LANGUAGE YAML AS $$\n{MV_YAML}\n$$")
-print(f"created {MV_NAME}")
+# ALTER VIEW keeps grants; CREATE only on first deploy.
+if spark.catalog.tableExists(MV_NAME):
+    spark.sql(f"ALTER VIEW {MV_NAME} AS $$\n{MV_YAML}\n$$")
+    print(f"altered {MV_NAME}")
+else:
+    spark.sql(f"CREATE VIEW {MV_NAME} WITH METRICS LANGUAGE YAML AS $$\n{MV_YAML}\n$$")
+    print(f"created {MV_NAME}")
