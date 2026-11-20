@@ -1,0 +1,68 @@
+bundle:
+  name: game-cx-players-console
+
+variables:
+  sql_warehouse_id:
+    description: SQL Warehouse ID
+  genie_space_id:
+    description: Default Genie Space ID
+  genie_space_name:
+    description: Genie Space display name
+  genie_space_experience_id:
+    description: Player Experience & LiveOps Genie Space ID
+  postgres_branch:
+    description: Full Lakebase Postgres branch resource name. Obtain by running `databricks postgres list-branches {project-name}`, select the desired item from the output array and use its .name value. Requires the project resource name.
+  postgres_database:
+    description: Full Lakebase Postgres database resource name. Obtain by running `databricks postgres list-databases {branch-name}`, select the desired item from the output array and use its .name value. Requires the branch resource name.
+
+resources:
+  apps:
+    app:
+      name: "game-cx-players-console"
+      description: "Emberline Player Trust & Safety console"
+      source_code_path: ./
+
+      # Start the app automatically on deploy.
+      lifecycle:
+        started: true
+      user_api_scopes:
+        - genie
+        - sql
+
+      # The resources which this app has access to.
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.sql_warehouse_id}
+            permission: CAN_USE
+        - name: genie-space
+          genie_space:
+            name: ${var.genie_space_name}
+            space_id: ${var.genie_space_id}
+            permission: CAN_RUN
+        - name: genie-space-2
+          genie_space:
+            name: "Emberline - Player Experience & LiveOps"
+            space_id: ${var.genie_space_experience_id}
+            permission: CAN_RUN
+        - name: database
+          postgres:
+            branch: ${var.postgres_branch}
+            database: ${var.postgres_database}
+            permission: CAN_CONNECT_AND_CREATE
+
+targets:
+  # Single workspace target. Named "dev" to match the repo-root alerts bundle.
+  # No `mode: development`: that would prefix and rename the existing app.
+  dev:
+    default: true
+    workspace:
+      host: https://fevm-mg-aws-serverless-workspace.cloud.databricks.com
+
+    variables:
+      sql_warehouse_id: ea70e66018f416fb
+      genie_space_id: 01f1e3a90ede1597be6672ea8668991e
+      genie_space_name: "Emberline - Fraud & Trust Safety"
+      genie_space_experience_id: 01f1e3acd3fc1b039e9c20dbf124669b
+      postgres_branch: projects/game-cx-players-lakebase/branches/production
+      postgres_database: projects/game-cx-players-lakebase/branches/production/databases/databricks-postgres

@@ -1,0 +1,10 @@
+command: ['pnpm', 'run', 'start']
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: DATABRICKS_GENIE_SPACE_ID
+    valueFrom: genie-space
+  - name: DATABRICKS_GENIE_SPACE_EXPERIENCE
+    valueFrom: genie-space-2
+  - name: LAKEBASE_ENDPOINT
+    valueFrom: database
