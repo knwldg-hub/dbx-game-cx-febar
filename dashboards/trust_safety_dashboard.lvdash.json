@@ -1,0 +1,1206 @@
+{
+  "datasets": [
+    {
+      "asset_name": "mg_aws_serverless_workspace_catalog.game_cx_players.mv_player_trust_safety",
+      "catalog": "mg_aws_serverless_workspace_catalog",
+      "displayName": "Trust & Safety metrics",
+      "name": "ds_mv",
+      "schema": "game_cx_players"
+    },
+    {
+      "catalog": "mg_aws_serverless_workspace_catalog",
+      "displayName": "Moderation queue",
+      "name": "ds_moderation",
+      "queryLines": [
+        "SELECT player_id, ROUND(fraud_risk_score, 3) AS fraud_risk_score,\n",
+        "       ROUND(COALESCE(toxicity_score, 0), 3) AS toxicity_score,\n",
+        "       recommended_action,\n",
+        "       ROUND(lifetime_spend_usd, 2) AS lifetime_spend_usd,\n",
+        "       reports_received\n",
+        "FROM gold_mart_player_360\n",
+        "WHERE recommended_action IS NOT NULL\n",
+        "ORDER BY fraud_risk_score DESC\n",
+        "LIMIT 200"
+      ],
+      "schema": "game_cx_players"
+    }
+  ],
+  "pages": [
+    {
+      "displayName": "Overview",
+      "layout": [
+        {
+          "position": {
+            "height": 1,
+            "width": 12,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Emberline Player Trust & Safety"
+              ]
+            },
+            "name": "title-p1"
+          }
+        },
+        {
+          "position": {
+            "height": 1,
+            "width": 12,
+            "x": 0,
+            "y": 1
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "Real-time trust & safety KPIs for Emberline Studios across 6 titles. Chargeback figures shown for closed window (≥75 days since purchase)."
+              ]
+            },
+            "name": "subtitle-p1"
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 3,
+            "x": 0,
+            "y": 2
+          },
+          "widget": {
+            "name": "kpi-gross-rev",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`gross_revenue_usd`)",
+                      "name": "measure(gross_revenue_usd)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Gross Revenue",
+                  "fieldName": "measure(gross_revenue_usd)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Gross Revenue"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 3,
+            "x": 3,
+            "y": 2
+          },
+          "widget": {
+            "name": "kpi-net-rev",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`net_revenue_usd`)",
+                      "name": "measure(net_revenue_usd)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Net Revenue",
+                  "fieldName": "measure(net_revenue_usd)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Net Revenue"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 3,
+            "x": 6,
+            "y": 2
+          },
+          "widget": {
+            "name": "kpi-cb-rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`chargeback_rate`)",
+                      "name": "measure(chargeback_rate)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Chargeback Rate",
+                  "fieldName": "measure(chargeback_rate)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 2,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargeback Rate"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 3,
+            "x": 9,
+            "y": 2
+          },
+          "widget": {
+            "name": "kpi-rpt-count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`report_count`)",
+                      "name": "measure(report_count)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Player Reports",
+                  "fieldName": "measure(report_count)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Player Reports"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 0,
+            "y": 5
+          },
+          "widget": {
+            "name": "bar-rev-game",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`game_title`",
+                      "name": "game_title"
+                    },
+                    {
+                      "expression": "MEASURE(`gross_revenue_usd`)",
+                      "name": "measure(gross_revenue_usd)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`gross_revenue_usd`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "game_title",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(gross_revenue_usd)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Gross Revenue by Game"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 6,
+            "y": 5
+          },
+          "widget": {
+            "name": "bar-cb-game",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`game_title`",
+                      "name": "game_title"
+                    },
+                    {
+                      "expression": "MEASURE(`chargeback_rate`)",
+                      "name": "measure(chargeback_rate)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`chargeback_rate`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "game_title",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(chargeback_rate)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargeback Rate by Game"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 0,
+            "y": 10
+          },
+          "widget": {
+            "name": "bar-rev-region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`player_region`",
+                      "name": "player_region"
+                    },
+                    {
+                      "expression": "MEASURE(`gross_revenue_usd`)",
+                      "name": "measure(gross_revenue_usd)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`gross_revenue_usd`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "player_region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(gross_revenue_usd)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Revenue by Player Region"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 6,
+            "y": 10
+          },
+          "widget": {
+            "name": "bar-rev-age",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`age_band`",
+                      "name": "age_band"
+                    },
+                    {
+                      "expression": "MEASURE(`gross_revenue_usd`)",
+                      "name": "measure(gross_revenue_usd)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`gross_revenue_usd`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "age_band",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(gross_revenue_usd)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Revenue by Age Band"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        }
+      ],
+      "layoutVersion": "GRID_V1",
+      "name": "overview",
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "displayName": "Fraud & Chargebacks",
+      "layout": [
+        {
+          "position": {
+            "height": 1,
+            "width": 12,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Fraud & Chargeback Analysis"
+              ]
+            },
+            "name": "title-p2"
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 0,
+            "y": 1
+          },
+          "widget": {
+            "name": "kpi-cb-loss",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`chargeback_loss_usd`)",
+                      "name": "measure(chargeback_loss_usd)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Chargeback Loss",
+                  "fieldName": "measure(chargeback_loss_usd)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargeback Loss"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 4,
+            "y": 1
+          },
+          "widget": {
+            "name": "kpi-cb-count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`chargeback_count`)",
+                      "name": "measure(chargeback_count)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Chargebacks",
+                  "fieldName": "measure(chargeback_count)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargebacks"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 8,
+            "y": 1
+          },
+          "widget": {
+            "name": "kpi-arppu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`arppu_usd`)",
+                      "name": "measure(arppu_usd)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "ARPPU",
+                  "fieldName": "measure(arppu_usd)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "ARPPU"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 8,
+            "x": 0,
+            "y": 4
+          },
+          "widget": {
+            "name": "line-cb-trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`event_month`",
+                      "name": "event_month"
+                    },
+                    {
+                      "expression": "MEASURE(`chargeback_rate`)",
+                      "name": "measure(chargeback_rate)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`event_month`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "event_month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(chargeback_rate)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargeback Rate Over Time"
+              },
+              "version": 3,
+              "widgetType": "line"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 4,
+            "x": 8,
+            "y": 4
+          },
+          "widget": {
+            "name": "pie-cb-reason",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`chargeback_count`)",
+                      "name": "measure(chargeback_count)"
+                    },
+                    {
+                      "expression": "`chargeback_reason`",
+                      "name": "chargeback_reason"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "angle": {
+                  "displayName": "Chargebacks by Reason",
+                  "fieldName": "measure(chargeback_count)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "displayName": "chargeback_reason",
+                  "fieldName": "chargeback_reason",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargebacks by Reason"
+              },
+              "version": 3,
+              "widgetType": "pie"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 0,
+            "y": 9
+          },
+          "widget": {
+            "name": "bar-cb-loss-game",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`game_title`",
+                      "name": "game_title"
+                    },
+                    {
+                      "expression": "MEASURE(`chargeback_loss_usd`)",
+                      "name": "measure(chargeback_loss_usd)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`chargeback_loss_usd`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "game_title",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(chargeback_loss_usd)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargeback Loss by Game"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 6,
+            "y": 9
+          },
+          "widget": {
+            "name": "bar-cb-payment",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`payment_method`",
+                      "name": "payment_method"
+                    },
+                    {
+                      "expression": "MEASURE(`chargeback_count`)",
+                      "name": "measure(chargeback_count)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`chargeback_count`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "payment_method",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(chargeback_count)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chargebacks by Payment Method"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        }
+      ],
+      "layoutVersion": "GRID_V1",
+      "name": "fraud_chargebacks",
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "displayName": "Player Reports",
+      "layout": [
+        {
+          "position": {
+            "height": 1,
+            "width": 12,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Player Reports & Moderation Queue"
+              ]
+            },
+            "name": "title-p3"
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 0,
+            "y": 1
+          },
+          "widget": {
+            "name": "kpi-rpt",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`report_count`)",
+                      "name": "measure(report_count)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Total Reports",
+                  "fieldName": "measure(report_count)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total Reports"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 4,
+            "y": 1
+          },
+          "widget": {
+            "name": "kpi-rpt-plyr",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`reported_players`)",
+                      "name": "measure(reported_players)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "Reported Players",
+                  "fieldName": "measure(reported_players)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reported Players"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 8,
+            "y": 1
+          },
+          "widget": {
+            "name": "kpi-hvp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "MEASURE(`high_value_player_count`)",
+                      "name": "measure(high_value_player_count)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "value": {
+                  "displayName": "High-Value Players",
+                  "fieldName": "measure(high_value_player_count)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "High-Value Players"
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 0,
+            "y": 4
+          },
+          "widget": {
+            "name": "bar-rpt-cat",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`report_category`",
+                      "name": "report_category"
+                    },
+                    {
+                      "expression": "MEASURE(`report_count`)",
+                      "name": "measure(report_count)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`report_count`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "report_category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(report_count)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reports by Category"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 6,
+            "x": 6,
+            "y": 4
+          },
+          "widget": {
+            "name": "bar-rpt-game",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_mv",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`game_title`",
+                      "name": "game_title"
+                    },
+                    {
+                      "expression": "MEASURE(`report_count`)",
+                      "name": "measure(report_count)"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`report_count`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "x": {
+                  "fieldName": "game_title",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(report_count)",
+                  "scale": {
+                    "domainMin": 0,
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reports by Game"
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 7,
+            "width": 12,
+            "x": 0,
+            "y": 9
+          },
+          "widget": {
+            "name": "tbl-moderation",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_moderation",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "expression": "`player_id`",
+                      "name": "player_id"
+                    },
+                    {
+                      "expression": "`fraud_risk_score`",
+                      "name": "fraud_risk_score"
+                    },
+                    {
+                      "expression": "`toxicity_score`",
+                      "name": "toxicity_score"
+                    },
+                    {
+                      "expression": "`recommended_action`",
+                      "name": "recommended_action"
+                    },
+                    {
+                      "expression": "`lifetime_spend_usd`",
+                      "name": "lifetime_spend_usd"
+                    },
+                    {
+                      "expression": "`reports_received`",
+                      "name": "reports_received"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "encodings": {
+                "columns": [
+                  {
+                    "displayName": "Player",
+                    "fieldName": "player_id"
+                  },
+                  {
+                    "displayName": "Fraud Score",
+                    "fieldName": "fraud_risk_score"
+                  },
+                  {
+                    "displayName": "Toxicity Score",
+                    "fieldName": "toxicity_score"
+                  },
+                  {
+                    "displayName": "Action",
+                    "fieldName": "recommended_action"
+                  },
+                  {
+                    "displayName": "Lifetime Spend ($)",
+                    "fieldName": "lifetime_spend_usd"
+                  },
+                  {
+                    "displayName": "Reports",
+                    "fieldName": "reports_received"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Moderation Queue (Top 200 by Fraud Risk)"
+              },
+              "version": 2,
+              "widgetType": "table"
+            }
+          }
+        }
+      ],
+      "layoutVersion": "GRID_V1",
+      "name": "player_reports",
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "applyModeEnabled": false,
+    "genieSpace": {
+      "enablementMode": "ENABLED",
+      "isEnabled": true,
+      "overrideId": "01f1e3a90ede1597be6672ea8668991e"
+    },
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    }
+  }
+}

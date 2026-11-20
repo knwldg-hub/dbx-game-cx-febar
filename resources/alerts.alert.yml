@@ -1,0 +1,57 @@
+# SQL alerts (moved unchanged from the former game-cx-players-alerts bundle).
+resources:
+  alerts:
+    fraud_ring_alert:
+      display_name: 'game-cx-players-fraud-ring-alert'
+      # Alerts cannot move folders; keep the location from the original alerts bundle.
+      parent_path: ${var.alerts_parent_path}
+      query_text: |
+        SELECT COUNT(*) AS high_risk_fraud_players
+        FROM mg_aws_serverless_workspace_catalog.game_cx_players.gold_mart_player_360
+        WHERE fraud_risk_score > 0.8
+      warehouse_id: ${var.warehouse_id}
+
+      evaluation:
+        comparison_operator: 'GREATER_THAN'
+        source:
+          name: 'high_risk_fraud_players'
+          display: 'high_risk_fraud_players'
+        threshold:
+          value:
+            double_value: 0
+        notification:
+          notify_on_ok: false
+          subscriptions:
+            - user_email: ${var.notify_email}
+
+      schedule:
+        pause_status: 'UNPAUSED'
+        quartz_cron_schedule: '0 0/15 * * * ?'
+        timezone_id: 'America/Los_Angeles'
+
+    toxicity_spike_alert:
+      display_name: 'game-cx-players-toxicity-spike-alert'
+      parent_path: ${var.alerts_parent_path}
+      query_text: |
+        SELECT CAST(ROUND(SUM(CAST(is_toxic AS INT)) * 1000.0 / COUNT(*), 1) AS DOUBLE)
+               AS toxic_msgs_per_1k
+        FROM mg_aws_serverless_workspace_catalog.game_cx_players.ml_toxicity_message_labels
+      warehouse_id: ${var.warehouse_id}
+
+      evaluation:
+        comparison_operator: 'GREATER_THAN'
+        source:
+          name: 'toxic_msgs_per_1k'
+          display: 'toxic_msgs_per_1k'
+        threshold:
+          value:
+            double_value: 500
+        notification:
+          notify_on_ok: false
+          subscriptions:
+            - user_email: ${var.notify_email}
+
+      schedule:
+        pause_status: 'UNPAUSED'
+        quartz_cron_schedule: '0 0/30 * * * ?'
+        timezone_id: 'America/Los_Angeles'

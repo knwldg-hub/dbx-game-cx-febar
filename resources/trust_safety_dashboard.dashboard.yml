@@ -1,0 +1,8 @@
+resources:
+  dashboards:
+    trust_safety_dashboard:
+      display_name: "Emberline Player Trust & Safety"
+      warehouse_id: ${var.warehouse_id}
+      file_path: ../dashboards/trust_safety_dashboard.lvdash.json
+      # Keep the existing location so deploy updates the dashboard in place (same ID, links keep working).
+      parent_path: /Users/${workspace.current_user.userName}

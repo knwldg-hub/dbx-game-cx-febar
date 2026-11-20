@@ -1,65 +1,60 @@
+# Root bundle for Emberline Game CX: data platform resources as code.
+#   resources/medallion_pipeline.pipeline.yml   bronze -> silver -> gold -> gold_mart_player_360
+#   resources/daily_refresh.job.yml             daily closed loop (Lakebase -> lakehouse -> Lakebase)
+#   resources/alerts.alert.yml                  fraud-ring and toxicity-spike SQL alerts
+#   resources/trust_safety_dashboard.dashboard.yml  AI/BI dashboard
+# The console app has its own bundle in app/game-cx-players-console/ (deployed separately).
+# Not managed here (created once by notebooks): Lakebase project + synced table (05_setup_lakebase),
+# metric views and governance (governance/), Genie spaces, ML models.
 bundle:
-  name: game-cx-players-alerts
+  name: game-cx-players
+
+include:
+  - resources/*.yml
+
+sync:
+  exclude:
+    - app/**
+    - test1
 
 variables:
+  catalog:
+    description: Unity Catalog catalog
+    default: mg_aws_serverless_workspace_catalog
+  schema:
+    description: Schema for all pipeline tables, metric views and ML tables
+    default: game_cx_players
   warehouse_id:
-    description: SQL warehouse ID for alert evaluation
+    description: SQL warehouse for alerts and the dashboard
     default: ea70e66018f416fb
+  notify_email:
+    description: Recipient of job-failure emails and alert notifications
+    default: mayur.gupta@databricks.com
+  lakebase_sync_pipeline_id:
+    description: Pipeline behind the lb_serve_player_risk_profile synced table (created by 05_setup_lakebase)
+    default: 62c0955d-e04f-4ae6-9cb1-7887d8425434
+  pipeline_development:
+    description: Run the medallion pipeline in development mode
+    default: true
+  schedule_pause_status:
+    description: UNPAUSED or PAUSED for the daily refresh schedule
+    default: UNPAUSED
+  alerts_parent_path:
+    description: Workspace folder for the SQL alerts (alerts cannot be moved once created)
+    default: /Workspace/Users/${workspace.current_user.userName}/.bundle/game-cx-players-alerts/dev/resources
 
 targets:
+  # Current demo workspace. No `mode: development`, so existing resources keep their names once bound.
   dev:
     default: true
+    workspace:
+      host: https://fevm-mg-aws-serverless-workspace.cloud.databricks.com
 
-resources:
-  alerts:
-    fraud_ring_alert:
-      display_name: 'game-cx-players-fraud-ring-alert'
-      query_text: |
-        SELECT COUNT(*) AS high_risk_fraud_players
-        FROM mg_aws_serverless_workspace_catalog.game_cx_players.gold_mart_player_360
-        WHERE fraud_risk_score > 0.8
-      warehouse_id: ${var.warehouse_id}
-
-      evaluation:
-        comparison_operator: 'GREATER_THAN'
-        source:
-          name: 'high_risk_fraud_players'
-          display: 'high_risk_fraud_players'
-        threshold:
-          value:
-            double_value: 0
-        notification:
-          notify_on_ok: false
-          subscriptions:
-            - user_email: 'mayur.gupta@databricks.com'
-
-      schedule:
-        pause_status: 'UNPAUSED'
-        quartz_cron_schedule: '0 0/15 * * * ?'
-        timezone_id: 'America/Los_Angeles'
-
-    toxicity_spike_alert:
-      display_name: 'game-cx-players-toxicity-spike-alert'
-      query_text: |
-        SELECT CAST(ROUND(SUM(CAST(is_toxic AS INT)) * 1000.0 / COUNT(*), 1) AS DOUBLE)
-               AS toxic_msgs_per_1k
-        FROM mg_aws_serverless_workspace_catalog.game_cx_players.ml_toxicity_message_labels
-      warehouse_id: ${var.warehouse_id}
-
-      evaluation:
-        comparison_operator: 'GREATER_THAN'
-        source:
-          name: 'toxic_msgs_per_1k'
-          display: 'toxic_msgs_per_1k'
-        threshold:
-          value:
-            double_value: 500
-        notification:
-          notify_on_ok: false
-          subscriptions:
-            - user_email: 'mayur.gupta@databricks.com'
-
-      schedule:
-        pause_status: 'UNPAUSED'
-        quartz_cron_schedule: '0 0/30 * * * ?'
-        timezone_id: 'America/Los_Angeles'
+  # Production-style settings for a customer workspace: pass --var for catalog, warehouse and Lakebase pipeline.
+  prod:
+    mode: production
+    variables:
+      pipeline_development: false
+      alerts_parent_path: ${workspace.resource_path}
+    run_as:
+      user_name: mayur.gupta@databricks.com

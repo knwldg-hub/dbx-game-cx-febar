@@ -1,0 +1,15 @@
+# Lakeflow Spark Declarative Pipeline: bronze -> silver -> gold dims/facts -> gold_mart_player_360.
+# Every SQL file under pipelines/transformations/ is a library (27 files today).
+resources:
+  pipelines:
+    medallion_pipeline:
+      name: game-cx-players-pipeline
+      catalog: ${var.catalog}
+      target: ${var.schema}
+      serverless: true
+      continuous: false
+      channel: CURRENT
+      development: ${var.pipeline_development}
+      libraries:
+        - glob:
+            include: ../pipelines/transformations/**

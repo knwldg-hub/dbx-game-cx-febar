@@ -1,0 +1,44 @@
+# Daily closed loop: moderator decisions (Lakebase) -> lakehouse -> served risk profile (Lakebase).
+resources:
+  jobs:
+    daily_refresh:
+      name: game-cx-players-daily-refresh
+      description: >-
+        Daily closed loop for Emberline Game CX: (1) copy moderator decisions from Lakebase
+        lb_moderation_actions to Delta bronze_app_moderation_actions, (2) refresh the medallion pipeline so
+        ACTION events reach gold_fact_event and gold_mart_player_360, (3) refresh the Lakebase synced table
+        lb_serve_player_risk_profile that the console app reads.
+      tags:
+        project: game-cx-players
+      max_concurrent_runs: 1
+      timeout_seconds: 7200
+      email_notifications:
+        on_failure:
+          - ${var.notify_email}
+      schedule:
+        quartz_cron_expression: '0 0 6 * * ?'
+        timezone_id: America/Los_Angeles
+        pause_status: ${var.schedule_pause_status}
+      tasks:
+        - task_key: sync_moderation_actions
+          description: Lakebase lb_moderation_actions -> Delta bronze_app_moderation_actions (idempotent overwrite).
+          notebook_task:
+            notebook_path: ../notebooks/06_sync_moderation_actions.ipynb
+            source: WORKSPACE
+          max_retries: 1
+          min_retry_interval_millis: 60000
+
+        - task_key: refresh_medallion_pipeline
+          description: Incremental refresh of bronze -> silver -> gold -> gold_mart_player_360.
+          depends_on:
+            - task_key: sync_moderation_actions
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.medallion_pipeline.id}
+
+        - task_key: refresh_lakebase_serving
+          description: Snapshot sync gold_mart_player_360 -> Lakebase lb_serve_player_risk_profile.
+          depends_on:
+            - task_key: refresh_medallion_pipeline
+          pipeline_task:
+            # Managed by the synced table, not by this bundle; created in notebooks/05_setup_lakebase.
+            pipeline_id: ${var.lakebase_sync_pipeline_id}
