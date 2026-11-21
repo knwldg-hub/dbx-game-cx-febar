@@ -56,13 +56,20 @@ description: Domain knowledge for the Emberline Studios Game CX demo (catalog mg
 | Table | Grain | Key joins |
 |---|---|---|
 | `gold_fact_session` | 1 row / session | `player_id`, `game_id`, `device_id`, `date_key` → dims |
-| `gold_fact_event` | 1 row / event (PURCHASE or REPORT) | `player_id`, `game_id`, `date_key` → dims; `txn_id` for purchases; `report_id` for reports |
+| `gold_fact_event` | 1 row / event (PURCHASE, REPORT or ACTION) | `player_id`, `game_id`, `date_key` → dims. ACTION rows = moderator actions from the app (`action_type`, `moderator`, `action_ts`), read from `bronze_app_moderation_actions` |
 
 ### Gold mart
-`gold_mart_player_360` — 1 row per player, 50,000 rows. Columns: `player_id`, `lifetime_spend_usd`, `last_active_date`, `sessions_30d`, `engagement_trend`, `is_high_value_player`, `is_at_risk`, `churn_risk_score`, `fraud_risk_score`, `toxicity_score`, `reports_received`, `toxic_messages_received`, `recommended_action`. **Note**: `account_status` and `acquisition_channel` are only in `silver_players`, not in the mart.
+`gold_mart_player_360` — 1 row per player, 50,000 rows. 23 columns: `player_id`, `lifetime_spend_usd`, `last_active_date`, `sessions_30d`, `engagement_trend`, `is_high_value_player`, `is_at_risk`, `churn_risk_score`, `fraud_risk_score`, `toxicity_score`, `reports_received`, `toxic_messages_received`, `recommended_action`, `account_status` (only `active` / `closed`), `acquisition_channel`, `shooter_sessions`, `avg_accuracy_pct`, `avg_headshot_pct`, `kills_per_match`, `is_suspected_cheater`, `actions_taken`, `latest_action_type`, `latest_action_ts`.
 
-### Metric view
-`mv_player_trust_safety` — 15 dimensions × 13 measures on `gold_fact_event`. **Always query this for aggregated fraud, revenue, chargeback, and report KPIs**; do not re-aggregate from fact tables unless you need a grain the metric view doesn't expose.
+* `recommended_action` priority (highest wins): `suspend` > `review_fraud` > `warn_toxicity` > `review_cheating` > `retain` > `monitor`; NULL = no signal.
+* `is_suspected_cheater`: >= 3 shooter sessions and 2 of 3 signals (headshot >= 40%, accuracy >= 45%, kills/match >= 9). Precision 1.000, recall 0.936.
+* An "open" item = `actions_taken = 0`. Taking an action does not change `recommended_action`.
+* `account_status` is the account lifecycle, not engagement. Use `is_at_risk` / `last_active_date` for churn questions.
+
+### Metric views (always `MEASURE()` + `GROUP BY ALL`)
+`mv_player_engagement` — session grain on `gold_fact_session`. Measures: `session_count`, `active_players`, `avg_dau`, `stickiness_dau_mau`, `total_minutes`, `avg_session_minutes`, `sessions_per_player`, `avg_matchmaking_quality`, `poor_matchmaking_rate`, `avg_ping_ms`, `live_ops_sessions`, `live_ops_reach_players`, `suspected_cheaters`, `cheater_session_share`, `avg_headshot_pct`, `avg_accuracy_pct`. Dims include `session_date`, `session_month`, `is_last_30_days`, `game_title`, `platform`, `player_region`, `is_live_ops_session`, `live_ops_event_name`. Use it for DAU / MAU / stickiness. **Caveat:** `stickiness_dau_mau` is only meaningful within one 30-day window (filter `is_last_30_days = true` or one month); `active_players` over all time is 48,362, not MAU.
+
+`mv_player_trust_safety` — event grain on `gold_fact_event`; includes ACTION measures `action_count`, `actioned_players`, `suspensions_issued`, `warnings_issued` and dims `action_type`, `moderator`, `account_status`, `recommended_action`, `is_suspected_cheater`. **Always query this for aggregated fraud, revenue, chargeback, and report KPIs**; do not re-aggregate from fact tables unless you need a grain the metric view doesn't expose.
 
 **Key measures:** `gross_revenue_usd`, `net_revenue_usd`, `chargeback_rate`, `chargeback_loss_usd`, `report_count`, `high_value_player_count`, `arppu_usd`
 
@@ -118,11 +125,11 @@ GROUP BY ALL
 ORDER BY chargeback_rate DESC;
 ```
 
-### Account status / acquisition channel (from silver_players)
+### Account status / acquisition channel (now in the mart)
 ```sql
 SELECT account_status, COUNT(*) AS players
-FROM mg_aws_serverless_workspace_catalog.game_cx_players.silver_players
-GROUP BY account_status ORDER BY players DESC;
+FROM mg_aws_serverless_workspace_catalog.game_cx_players.gold_mart_player_360
+GROUP BY account_status ORDER BY players DESC;  -- active 49,108, closed 892
 ```
 
 ### High-value at-risk players (revenue at risk)
@@ -164,3 +171,11 @@ ORDER BY 1, 2;
 - Governed tags: `layer` (bronze/silver/gold), `data_classification` (pii/cui/u-nnpi), `pii_type` (email/phone).
 - Discover domains: `Player-Trust-Safety` (fraud, chargebacks, toxicity) and `Player-Experience` (engagement, live-ops, churn).
 - Pipeline `game-cx-players-pipeline` stays in development mode. Do not switch to production without asking the user.
+
+## Closed loop, serving and deployment
+
+- App `game-cx-players-console` reads Lakebase `game_cx_players.lb_serve_player_risk_profile` (synced snapshot of the mart) and writes `game_cx_players.lb_moderation_actions`.
+- Daily job `game-cx-players-daily-refresh` (06:00 PT): notebook 06 copies Lakebase actions to `bronze_app_moderation_actions` -> pipeline -> Lakebase sync. Actions reach analytics after the next run.
+- Pipeline, job, alerts and dashboard are managed by the root bundle `game-cx-players` (`databricks.yml` + `resources/`). Pipeline SQL edits only take effect after `bundle deploy`.
+- **App grants rule:** any new UC object read by an app query needs `SELECT` for the app service principal (`2344a89d-c525-4050-b62a-440a61c683e6`) **before** deploy; otherwise query typegen fails and the failed deployment takes the app down.
+- Metric view changes: use `ALTER VIEW` (keeps grants), not `CREATE OR REPLACE` (drops grants).

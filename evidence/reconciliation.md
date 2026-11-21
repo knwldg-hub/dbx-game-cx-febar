@@ -51,3 +51,19 @@ All other expectations (primary keys, non-null keys, positive amounts, date rang
 2. **Geography mapping.** ES, IT, NL, AR, PH (5,995 players) were mapped to region 'Other' and currency USD. Fixed in gold_dim_geography and gold_dim_player.
 3. **valid_accuracy flagged 53.7% of sessions.** Non-shooter titles have NULL accuracy, and a NULL expectation result counts as a failure. Fixed to `accuracy_pct IS NULL OR accuracy_pct BETWEEN 0 AND 100`.
 4. **valid_email flagged 0 rows.** The rule allowed NULL emails, which hid the injected defect. Fixed to `email IS NOT NULL AND email RLIKE ...`.
+
+## 5. Phase 9 additions (closed loop)
+
+`gold_fact_event` now has a third event type, `ACTION`, read from `bronze_app_moderation_actions` (snapshot of Lakebase
+`lb_moderation_actions`, written by `notebooks/06_sync_moderation_actions`).
+
+| Check | Result (2026-11-20, after Phase 11 closed-loop test) |
+|---|---|
+| gold_fact_event ACTION = bronze_app_moderation_actions | 17 = 17 PASS |
+| gold_fact_event total = PURCHASE + REPORT + ACTION | 948,078 + 57,509 + 17 = 1,005,604 PASS |
+| SUM(gold_mart_player_360.actions_taken) = ACTION events | 17 = 17 PASS |
+| silver_transactions revenue = gold_fact_event PURCHASE revenue | 20,141,969.22 = 20,141,969.22 PASS |
+| mv_player_engagement session_count = gold_fact_session | 7,077,744 = 7,077,744 PASS |
+| mv_player_engagement active_players (all time) = players - never played | 48,362 = 50,000 - 1,638 PASS |
+
+Full Phase 11 results: `evidence/e2e_verification.md`.

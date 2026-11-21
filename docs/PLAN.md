@@ -1,6 +1,6 @@
 # Game CX Players: Player 360, Payment Fraud and Toxicity (plan and requirements)
 
-Status: PHASE 7 COMPLETE. Owner: Mayur Gupta. Last updated: 2026-11-19.
+Status: ALL PHASES COMPLETE (0-11). Owner: Mayur Gupta. Last updated: 2026-11-20. Deck: `docs/DECK.md`. Verification: `evidence/e2e_verification.md`.
 
 Pipeline mode: stays in development mode. Production mode will be reviewed later, only if and when required (likely Phase 7, through the bundle's production target).
 
@@ -391,16 +391,19 @@ skills/
   commit_outputs                       enables .ipynb output commits to GitHub
 ```
 
-## 14. Value model (draft, to be refined with the generated data)
+## 14. Value model (refined 2026-11-20 with measured rates)
 
-Assumptions to confirm: about 8M MAU, about $600M annual bookings, 0.8% chargeback rate, $15 fee per chargeback, about 15% of players exposed to toxicity, $25 annual revenue per active player.
+Method: rates are measured in the generated data; dollars are scaled to Emberline's $600M annual bookings with one factor,
+$600M / $11.49M (sample 2026 bookings) = 52.2x. Full working in `docs/DECK.md` (appendix).
 
-| Lever | Estimate |
-|---|---|
-| Fraud: block or review 50% of fraudulent purchases | about $2.5-3M a year in losses and fees avoided, and a lower dispute ratio |
-| Toxicity: 30% less exposure, lower victim churn | about $1.8M a year in retained revenue |
-| Moderation: auto-triage 60% of reports | about $0.5M a year in analyst time |
-| **Total** | **about $5M a year** (estimate) |
+| Lever | Measured input | Assumption | Annual value |
+|---|---|---|---|
+| Fraud: review top 1% of purchases by fraud score | Loss 2.96% of gross (chargebacks + fees, closed window); model catches 75.6% of chargeback $ at 1% review | 50% of caught loss actually prevented | **$6.7M** (exposure $17.8M) |
+| Toxicity: act faster on toxic players | 9.7% of players are victims; victim churn 75.9% vs 55.6% (+20.3 pts); victims spent $820K in 2025 (sample) | 30% less exposure | **$2.6M** retained (of $8.7M lost) |
+| Moderation: LLM auto-triage of reports | 30,508 reports in 2026 (sample) = 1.59M at scale; LLM F1 0.994 | 60% auto-triaged, 3 min each, $25/hour | **$1.2M** (47,806 hours) |
+| **Total** | | | **$10.5M a year** (conservative, half realized: $5.3M) |
+
+KPI effect: chargeback rate 1.12% -> about 0.69%. Note: the synthetic data has a high fraud loss rate (injected rings); at half that rate the fraud lever is $3.4M.
 
 ## 15. Decisions and trade-offs (to expand in README)
 
@@ -456,27 +459,31 @@ Status: all planning questions decided. Remaining build-time check: exact fast-t
 | **2** | Lakeflow SDP pipeline `game-cx-players-pipeline`: **COMPLETE**. 27 datasets (9 bronze ST + 9 silver MV + 6 gold dim MV + 2 gold fact MV + 1 gold mart MV). Pipeline ID `8cc02b90-7598-4b0a-917a-0c7f64b78b6a`. Session drops 21,606 (0.30% negative duration_min). Fact event: 948,078 PURCHASE + 57,509 REPORT = 1,005,587. Chargebacks merged: 9,442. Mart: 50K players, 6,362 high-value. | Pipeline update SUCCESS, row-count reconciliation verified |
 | **3a** | Comments on all tables and columns: **COMPLETE**. Typed column lists in all 18 silver/gold pipeline files | Comments verified in `information_schema.columns` |
 | **3b** | Governed tags: **COMPLETE**. `layer` + `data_classification` on all 27 tables; `pii_type` on 5 email/phone columns; `domain` not used (account policy) | 54 table tags verified in `information_schema.table_tags` |
-| **3c** | ABAC: group `game_cx_pii_viewers`, UDF `mask_pii`, policy `mask_pii_policy` at schema level: **UDF DONE**, waiting on account group | Query as non-member → `***REDACTED***` (verified for UDF); as member → full value (pending group) |
-| **3d** | Lakehouse Monitoring on `silver_sessions`, `silver_transactions`, `silver_chat_messages`: **DEFERRED** (workspace monitor limit) | DQM dashboard created |
+| **3c** | PII masking: **COMPLETE**. Group `game_cx_pii_viewers` created (owner is a member); `mask_pii` attached as column masks in the pipeline MV column specs on 4 columns (`gold_dim_player.email`, `silver_players.email`, `silver_players.phone_number`, `silver_chat_messages.message_text`). A schema-level ABAC policy was not needed | Non-member → `***REDACTED***` (Phase 3c); member → 49,724 real emails (Phase 11) |
+| **3d** | Lakehouse Monitoring: **DEFERRED** (workspace 1,000-monitor limit, re-checked 2026-11-20; HTTP 429). Script ready: `governance/create_quality_profiles.py`. Pipeline expectations cover bronze -> silver quality meanwhile | n/a |
 | **3e** | Metric view `mv_player_trust_safety`: **COMPLETE (v1, 13 measures)** | Measures reconcile to silver tables |
-| **3f** | 2 UC Domains (`Player Trust & Safety`, `Player Experience`) + 4 sub-domains per section 11f; assign existing assets now, later-phase assets as they are built | Visible in Discover |
-| **3g** | 7 Glossary pages | Pages published in Discover |
+| **3f** | 2 UC Domains: **COMPLETE** (`Player-Trust-Safety`, `Player-Experience`, assets assigned by tag, `governance/domain_tags.sql`). Sub-domains **SKIPPED** (account governed-tag limit; custom sections on domain pages used instead) | Visible in Discover |
+| **3g** | 7 Glossary pages: **COMPLETE** | Pages in Discover |
 | **3h** | Custom skill `gaming-cx` in repo + `.assistant/skills/` | Skill loads cleanly |
 | **4** | `02_train_fraud_model`, `03_train_churn_model`, `04_classify_toxicity`, `05_build_player_360`: **COMPLETE**. Fraud PR-AUC 0.314, 75.6% CB$ caught at 1% review; churn ROC-AUC 0.882, 745 at-risk; toxicity LLM F1 0.994 vs keyword 0.191; gold_mart_player_360 wired (is_at_risk populated, 5 recommended_action values). See evidence/ml_evaluation.md | MLflow runs in game-cx-players-fraud / -churn / -toxicity-eval; model metrics in evidence/ml_evaluation.md; gold_mart_player_360 50,000 rows fully populated |
 | **5** | Lakebase `game-cx-players-lakebase`: **COMPLETE**. `lb_serve_player_risk_profile` SNAPSHOT-synced from `gold_mart_player_360` (50K rows, online); `lb_moderation_actions` write-back table created. Lookup avg 2.8ms max 5.2ms; write round-trip 27.6ms. See `notebooks/05_setup_lakebase.ipynb`. | Lookup <50ms ✓ (2.8ms avg), round-trip write ✓ (27.6ms) |
 | **6** | 2 Genie agents: **COMPLETE**. `Emberline - Fraud & Trust Safety` (ID `01f1e3a90ede1597be6672ea8668991e`): 8 tables, 15 example SQLs, 10 benchmarks, SQL snippets. `Emberline - Player Experience & LiveOps` (ID `01f1e3acd3fc1b039e9c20dbf124669b`): 9 tables (incl. silver_players for account_status/acquisition_channel), 18 example SQLs, 10 benchmarks. Both: text instructions with as_of_date rule + domain vocab + game reference. Benchmark run 2: **10/10 each** after fixes (MEASURE() on mv measures; silver_players scoping). | Fraud 10/10 ✓, PX 10/10 ✓ (run IDs 01f1e3b1bfa9…, 01f1e3b1c047…) |
 | **7** | AI/BI dashboard `Emberline Player Trust & Safety` (3 pages on `mv_player_trust_safety`) + 2 Databricks SQL Alerts V2: `game-cx-players-fraud-ring-alert` (new fraud ring members with `fraud_risk_score > 0.8`, every 15 min, email) and `game-cx-players-toxicity-spike-alert` (`toxic_msgs_per_1k` rolling 1-hour rate > 2× 7-day baseline, every 30 min, email). Both alerts deployed via bundle. Demo destination (initial): `mayur.gupta@databricks.com` only. Slack delivery DEFERRED to end of project (see Deferred items). For a real customer: swap DL / add channel — query SQL stays identical. | **COMPLETE**. Dashboard ID `01f1e3b78dc913c99aacf649b44c7888`, 3 pages (Overview, Fraud & Chargebacks, Player Reports). Theme: dark-navy/amber/teal. Fraud & Trust Safety Genie agent linked. Fraud-ring alert ID `2579395162054361`: 630 high-risk players, fires immediately (threshold > 0). Toxicity alert ID `2579395162054362`: 706/1K msgs, fires immediately (threshold > 500). Bundle `game-cx-players-alerts` deployed from `databricks.yml` at repo root. |
-| **8** | AppKit app `game-cx-players-console` (6 views: risk queue, player 360, fraud ring, KPI overview, Ask Trust & Safety (Genie agent 1), Ask Player Experience (Genie agent 2)). Two Genie plugin instances, each pointing at its scoped agent. | Smoke test passes; both Genie tabs return answers |
-| **9** | Bundle `databricks.yml`: pipeline + job + app; `dev` deploy and run | Job run SUCCESS |
-| **10** | README, deck, roleplay script, AI build log, evidence/ text files; commit all notebooks with outputs; push to GitHub | Repo public, all notebooks have output cells |
-| **11** | End-to-end verification: reconciliation, ABAC check, Lakebase round-trip, app smoke test, Genie benchmark | All checks pass, documented in evidence/ |
+| **8** | AppKit app `game-cx-players-console`: **COMPLETE**. Views: Executive Overview (landing), Risk Queue, Player 360, Fraud Rings, Ask Trust & Safety, Ask Player Experience. Reads Lakebase `lb_serve_player_risk_profile`, writes `lb_moderation_actions`; KPIs via the metric views on the SQL warehouse | Deployment `01f1e5145e631e4e9c798c140f6ff43e` RUNNING; build typegen + tsc pass |
+| **9** | Closed loop + automation: **COMPLETE**. Notebook 06 syncs Lakebase actions -> `bronze_app_moderation_actions` -> `gold_fact_event` ACTION rows; cheat signals + `review_cheating`; `mv_player_engagement`. Root bundle `game-cx-players` (pipeline, job, 2 alerts, dashboard; dev + prod targets); app in its own bundle. Daily job `game-cx-players-daily-refresh` (id 446833087163558, 06:00 PT) | 3 job runs SUCCESS; bundle deploy 0 created / 0 deleted after bind |
+| **10** | Docs: **COMPLETE**. README, `docs/DECK.md`, `docs/ROLEPLAY_SCRIPT.md`, `docs/AI_BUILD_LOG.md`, evidence files, skill update; all committed | Repo public |
+| **11** | End-to-end verification: **COMPLETE** | `evidence/e2e_verification.md`: closed-loop round trip, reconciliation, job, Lakebase latency, masking, cheat precision, Genie 10/10 x2, alerts/dashboard/app, secret scan |
 
 ### Deferred items (revisit at end of project)
 
 | Item | Status | To finish |
 |---|---|---|
 | Slack alert delivery to private channel `#game-cx-players-alerts-demo` | Slack app created, Incoming Webhooks on; webhook awaiting Slack admin approval | (1) Copy webhook URL once approved; (2) `databricks secrets put-secret game-cx-players slack-webhook-url`; (3) workspace admin creates a Slack notification destination (Settings → Notifications) — SQL Alerts V2 notify via destinations, not secrets; (4) add destination to both alerts in the bundle and redeploy; (5) fire a test row and confirm Slack message |
-| AI Gateway budget policy | Account-console only (no API) | Account console → Usage → Budgets → Resource type: Unity Gateway; set monthly cap + email |
+| AI Gateway budget policy | **SKIPPED 2026-11-20**: owner lacks account-admin rights to select the workspace | Account admin: Usage -> Budgets -> Add budget -> Resource type Unity Gateway; monthly cap + email. Toxicity labelling is a one-off batch, not in the daily job |
+| Slack delivery (above) | **SKIPPED 2026-11-20** (nice-to-have); alerts email the owner | As above |
+| UC sub-domains | **SKIPPED** (account governed-tag limit) | Needs admin to free tag quota |
+| Lakehouse quality monitors | **DEFERRED** (workspace monitor limit) | Run `governance/create_quality_profiles.py` when capacity frees |
+| Non-member masking re-test | Needs a second user outside `game_cx_pii_viewers` | Query `silver_players.email` as that user; expect `***REDACTED***` |
 
 1. Data generator + validation (notebook 01).
 2. Lakeflow pipeline (bronze, silver, gold star schema).

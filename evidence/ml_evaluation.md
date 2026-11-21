@@ -129,3 +129,39 @@ The LLM correctly distinguishes competitive banter ("you're trash lol") from gen
 | retain (high-value + at-risk) | 14 |
 
 Total rows: 50,000 (unchanged). `is_at_risk` is no longer NULL.
+
+## 4e. Cheat detection (Phase 9) — rule in `gold_mart_player_360`
+
+**Approach:** a transparent rule, not a model, so moderators can explain every flag. A player is `is_suspected_cheater` when they have
+>= 3 sessions in the shooter titles (Iron Vanguard, Starfall Legends) and at least 2 of 3 signals: average headshot >= 40%,
+average accuracy >= 45%, kills per match >= 9 (`pipelines/transformations/gold/mart/gold_mart_player_360.sql`). New action `review_cheating` sits between
+`warn_toxicity` and `retain` in the priority order.
+
+**Result vs ground truth** (`ground_truth/gt_players.is_cheater`, measured 2026-11-20):
+
+| Cheaters | Caught |
+|---|---|
+| >= 20 shooter sessions: 277 | 277 |
+| < 20 shooter sessions: 75 | 60 |
+| No shooter sessions: 8 | 0 (no accuracy data; undetectable by design) |
+| **Total 360** | **337** |
+
+| Metric | Value |
+|---|---|
+| Precision | **1.000** (0 false positives) |
+| Recall, all cheaters | 0.936 (337 / 360) |
+| Recall, cheaters who played a shooter | 0.957 (337 / 352) |
+
+**Recommended actions after Phase 9** (open = no moderator action yet):
+
+| recommended_action | Players | Open |
+|---|---|---|
+| (no signal) | 44,433 | |
+| review_fraud | 2,351 | 2,350 |
+| warn_toxicity | 1,649 | 1,648 |
+| monitor | 627 | 627 |
+| suspend | 619 | 618 |
+| review_cheating | 307 | 307 |
+| retain (high-value + at-risk) | 14 | 14 |
+
+30 of the 337 suspected cheaters carry a higher-priority action (18 `review_fraud`, 12 `warn_toxicity`), so 307 show as `review_cheating`.
